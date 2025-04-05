@@ -77,6 +77,11 @@ variable "APP_DB_USER" {
   sensitive   = true
 }
 
+variable "db_username" {
+  description = "The username for the RDS instance"
+  type        = string
+}
+
 variable "db_password" {
   description = "Database password"
   type        = string
