@@ -99,8 +99,8 @@ terraform-AWS-scalable-backend/
 
 1.  **Clone the repository:**
     ```bash
-    git clone <your-repository-url>
-    cd webapp-project
+    git clone https://github.com/AydenHerold/terraform-AWS-scalable-backend.git
+    cd terraform-AWS-scalable-backend
     ```
 2.  **Customize Variables:**
     *   Rename `terraform.tfvars.example` to `terraform.tfvars` (if applicable) or edit the existing `terraform.tfvars`.
