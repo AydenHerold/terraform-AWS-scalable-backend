@@ -1,5 +1,3 @@
-# main.tf (Formatted according to the provided diff)
-
 provider "aws" {
   region = var.aws_region
 }
@@ -452,8 +450,8 @@ resource "aws_iam_policy" "instance_policy" {
     Statement = [
       {
         # Required for CloudWatch Agent/Logs
-        Effect   = "Allow",
-        Action   = [
+        Effect = "Allow",
+        Action = [
           "logs:CreateLogGroup",
           "logs:CreateLogStream",
           "logs:PutLogEvents",
@@ -463,8 +461,8 @@ resource "aws_iam_policy" "instance_policy" {
       },
       {
         # Recommended for SSM Agent & Session Manager
-        Effect   = "Allow",
-        Action   = [
+        Effect = "Allow",
+        Action = [
           "ssm:UpdateInstanceInformation",
           "ssmmessages:CreateControlChannel",
           "ssmmessages:CreateDataChannel",
