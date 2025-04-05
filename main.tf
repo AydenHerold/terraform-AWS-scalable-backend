@@ -1,3 +1,5 @@
+# main.tf (Formatted according to the provided diff)
+
 provider "aws" {
   region = var.aws_region
 }
