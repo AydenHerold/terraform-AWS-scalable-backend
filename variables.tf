@@ -94,7 +94,7 @@ variable "YOUR-APP-ENV-assets" {
   type        = string
 }
 
-variable "yourdomain.example.com" {
+variable "yourdomain_example_com" {
   description = "Domain name for the application"
   type        = string
   default     = "example.com"
