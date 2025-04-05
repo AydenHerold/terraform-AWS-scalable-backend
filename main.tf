@@ -562,7 +562,7 @@ data "aws_route53_zone" "existing" {
   count = !var.create_route53_zone ? 1 : 0
   name  = var.domain_name
 
-  private_zone = false
+  private_zone = false # <--- Aligned correctly now
 }
 
 # Wait for Certificate Validation to Complete
