@@ -95,8 +95,19 @@ variable "YOUR-APP-ENV-assets" {
 }
 
 variable "assets_bucket_name" {
-  description = "Name of the S3 bucket for static assets"
+  description = "The name of the S3 bucket for storing assets"
   type        = string
+}
+
+variable "domain_name" {
+  description = "The domain name for the application"
+  type        = string
+}
+
+variable "alb_ssl_policy" {
+  description = "SSL policy for the ALB HTTPS listener"
+  type        = string
+  default     = "ELBSecurityPolicy-2016-08"
 }
 
 variable "yourdomain_example_com" {
