@@ -94,6 +94,11 @@ variable "YOUR-APP-ENV-assets" {
   type        = string
 }
 
+variable "assets_bucket_name" {
+  description = "Name of the S3 bucket for static assets"
+  type        = string
+}
+
 variable "yourdomain_example_com" {
   description = "Domain name for the application"
   type        = string
