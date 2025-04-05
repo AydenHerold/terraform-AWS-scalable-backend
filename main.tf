@@ -186,25 +186,14 @@ resource "aws_lb_listener" "https" {
 
 # Auto Scaling Group
 resource "aws_launch_template" "web" {
-  name_prefix = "${var.project_name}-web-"
-  image_id = var.ami_id
+  name_prefix   = "${var.project_name}-web-"
+  image_id      = var.ami_id
   instance_type = var.instance_type
 
   vpc_security_group_ids = [aws_security_group.web.id]
 
   iam_instance_profile {
     name = aws_iam_instance_profile.instance_profile.name
-  }
-
-  user_data = base64encode(<<-EOF
-    #!/bin/bash
-    echo "Hello World" > /var/www/html/index.html # Add your user data script to install config web server
-  EOF
-  )
-
-  tag_specifications {
-    resource_type = "instance"
-    tags = merge(var.tags, { Name = "${var.project_name}-web" })
   }
 
   user_data = base64encode(<<-EOF
@@ -216,18 +205,16 @@ resource "aws_launch_template" "web" {
     # Install CW Agent, configure it, start it
     # Install dependencies (node, python, java etc)
     # Get application code (e.g., from S3, CodeDeploy)
-    # Fetch DB creds from Secrets Manager using aws cli
+    # Fetch DB creds from Secrets Manager using aws cli (leveraging the IAM role)
     # Configure application
     # Start application service
     echo "Instance setup complete (placeholder)" > /var/www/html/index.html
   EOF
   )
-
   tag_specifications {
     resource_type = "instance"
-    tags = merge(var.tags, { Name = "${var.project_name}-web" })
+    tags          = merge(var.tags, { Name = "${var.project_name}-web" })
   }
-
 }
 
 resource "aws_autoscaling_group" "web" {
