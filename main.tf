@@ -4,52 +4,52 @@ provider "aws" {
 
 # VPC w/ subnets across multiple AZs
 module "vpc" {
-  source = "terraform-aws-modules/vpc/aws"
+  source  = "terraform-aws-modules/vpc/aws"
   version = "~> 3.0"
 
   name = "${var.project_name}-vpc"
   cidr = var.vpc_cidr
 
-  azs = var.availability_zones
+  azs             = var.availability_zones
   private_subnets = var.private_subnet_cidrs
-  public_subnets = var.public_subnet_cidrs
+  public_subnets  = var.public_subnet_cidrs
 
-  enable_nat_gateway = true
-  single_nat_gateway = false
+  enable_nat_gateway     = true
+  single_nat_gateway     = false
   one_nat_gateway_per_az = true
 
   enable_vpn_gateway = false
 
   enable_dns_hostnames = true
-  enable_dns_support = true
+  enable_dns_support   = true
 
   tags = var.tags
 }
 
 # Security Groups
 resource "aws_security_group" "alb" {
-  name = "${var.project_name}-alb-sg"
+  name        = "${var.project_name}-alb-sg"
   description = "Controls access to the ALB"
-  vpc_id = module.vpc.vpc_id
+  vpc_id      = module.vpc.vpc_id
 
   ingress {
-    protocol = "tcp"
-    from_port = 80
-    to_port = 80
+    protocol    = "tcp"
+    from_port   = 80
+    to_port     = 80
     cidr_blocks = ["0.0.0.0/0"]
   }
 
   ingress {
-    protocol = "tcp"
-    from_port = 443
-    to_port = 443
+    protocol    = "tcp"
+    from_port   = 443
+    to_port     = 443
     cidr_blocks = ["0.0.0.0/0"]
   }
 
   egress {
-    protocol = "-1"
-    from_port = 0
-    to_port = 0
+    protocol    = "-1"
+    from_port   = 0
+    to_port     = 0
     cidr_blocks = ["0.0.0.0/0"]
   }
 
@@ -62,7 +62,7 @@ resource "aws_acm_certificate" "cert" {
   domain_name = var.domain_name
   # Add SANs if needed, e.g., www.
   subject_alternative_names = ["www.${var.domain_name}"]
-  validation_method = "DNS"
+  validation_method         = "DNS"
 
   # Requires the Route 53 Zone to exist first if managing via TF
   # If zone is created conditionally, this needs to handle the count
@@ -76,21 +76,21 @@ resource "aws_acm_certificate" "cert" {
 }
 
 resource "aws_security_group" "web" {
-  name = "${var.project_name}-web-sg"
+  name        = "${var.project_name}-web-sg"
   description = "Controls access to web servers"
-  vpc_id = module.vpc.vpc_id
+  vpc_id      = module.vpc.vpc_id
 
   ingress {
-    protocol = "tcp"
-    from_port = 80
-    to_port = 80
+    protocol        = "tcp"
+    from_port       = 80
+    to_port         = 80
     security_groups = [aws_security_group.alb.id]
   }
 
   egress {
-    protocol = "-1"
-    from_port = 0
-    to_port = 0
+    protocol    = "-1"
+    from_port   = 0
+    to_port     = 0
     cidr_blocks = ["0.0.0.0/0"]
   }
 
@@ -98,21 +98,21 @@ resource "aws_security_group" "web" {
 }
 
 resource "aws_security_group" "db" {
-  name = "${var.project_name}-db-sg"
+  name        = "${var.project_name}-db-sg"
   description = "Controls access to the database"
-  vpc_id = module.vpc.vpc_id
+  vpc_id      = module.vpc.vpc_id
 
   ingress {
-    protocol = "tcp"
-    from_port = 3306
-    to_port = 3306
+    protocol        = "tcp"
+    from_port       = 3306
+    to_port         = 3306
     security_groups = [aws_security_group.web.id]
   }
 
   egress {
-    protocol = "-1"
-    from_port = 0
-    to_port = 0
+    protocol    = "-1"
+    from_port   = 0
+    to_port     = 0
     cidr_blocks = ["0.0.0.0/0"]
   }
   tags = var.tags
@@ -120,11 +120,11 @@ resource "aws_security_group" "db" {
 
 # App Load Balancer
 resource "aws_lb" "app" {
-  name = "${var.project_name}-alb"
-  internal = false
+  name               = "${var.project_name}-alb"
+  internal           = false
   load_balancer_type = "application"
-  security_groups = [aws_security_group.alb.id]
-  subnets = module.vpc.public_subnets
+  security_groups    = [aws_security_group.alb.id]
+  subnets            = module.vpc.public_subnets
 
   enable_deletion_protection = false
 
@@ -132,21 +132,21 @@ resource "aws_lb" "app" {
 }
 
 resource "aws_lb_target_group" "app" {
-  name = "${var.project_name}-tg"
-  port = 80
+  name     = "${var.project_name}-tg"
+  port     = 80
   protocol = "HTTP"
-  vpc_id = module.vpc.vpc_id
+  vpc_id   = module.vpc.vpc_id
 
   health_check {
-    enabled = true
-    interval = 30
-    path = "/"
-    port = "traffic-port"
-    healthy_threshold = 3
+    enabled             = true
+    interval            = 30
+    path                = "/"
+    port                = "traffic-port"
+    healthy_threshold   = 3
     unhealthy_threshold = 3
-    timeout = 5
-    protocol = "HTTP"
-    matcher = "200-299"
+    timeout             = 5
+    protocol            = "HTTP"
+    matcher             = "200-299"
   }
 
   tags = var.tags
@@ -154,14 +154,14 @@ resource "aws_lb_target_group" "app" {
 
 resource "aws_lb_listener" "http" {
   load_balancer_arn = aws_lb.app.arn
-  port = 80
-  protocol = "HTTP"
+  port              = 80
+  protocol          = "HTTP"
 
   default_action {
     type = "redirect"
     redirect {
-      port = "443"
-      protocol = "HTTPS"
+      port        = "443"
+      protocol    = "HTTPS"
       status_code = "HTTP_301"
     }
   }
@@ -170,13 +170,13 @@ resource "aws_lb_listener" "http" {
 # HTTPS Listener
 resource "aws_lb_listener" "https" {
   load_balancer_arn = aws_lb.app.arn
-  port = 443
-  protocol = "HTTPS"
-  ssl_policy = var.alb_ssl_policy
-  certificate_arn = aws_acm_certificate_validation.cert.certificate_arn # Use validated cert ARN
+  port              = 443
+  protocol          = "HTTPS"
+  ssl_policy        = var.alb_ssl_policy
+  certificate_arn   = aws_acm_certificate_validation.cert.certificate_arn # Use validated cert ARN
 
   default_action {
-    type = "forward"
+    type             = "forward"
     target_group_arn = aws_lb_target_group.app.arn
   }
 
@@ -219,33 +219,33 @@ resource "aws_launch_template" "web" {
 }
 
 resource "aws_autoscaling_group" "web" {
-  name = "${var.project_name}-asg"
+  name                = "${var.project_name}-asg"
   vpc_zone_identifier = module.vpc.private_subnets
-  desired_capacity = var.asg_desired_capacity
-  min_size = var.asg_min_size
-  max_size = var.asg_max_size
+  desired_capacity    = var.asg_desired_capacity
+  min_size            = var.asg_min_size
+  max_size            = var.asg_max_size
 
   launch_template {
-    id = aws_launch_template.web.id
+    id      = aws_launch_template.web.id
     version = "$Latest"
   }
 
   target_group_arns = [aws_lb_target_group.app.arn]
 
-  health_check_type = "ELB"
+  health_check_type         = "ELB"
   health_check_grace_period = 300
 
   tag {
-    key = "Name"
-    value = "${var.project_name}-web"
+    key                 = "Name"
+    value               = "${var.project_name}-web"
     propagate_at_launch = true
   }
 
   dynamic "tag" {
     for_each = var.tags
     content {
-      key = tag.key
-      value = tag.value
+      key                 = tag.key
+      value               = tag.value
       propagate_at_launch = true
     }
   }
@@ -253,34 +253,34 @@ resource "aws_autoscaling_group" "web" {
 
 # Scale up policy
 resource "aws_autoscaling_policy" "scale_up" {
-  name = "${var.project_name}-scale-up"
-  scaling_adjustment = 1
-  adjustment_type = "ChangeInCapacity"
-  cooldown = 300
+  name                   = "${var.project_name}-scale-up"
+  scaling_adjustment     = 1
+  adjustment_type        = "ChangeInCapacity"
+  cooldown               = 300
   autoscaling_group_name = aws_autoscaling_group.web.name
 }
 
 # Scale down policy
 resource "aws_autoscaling_policy" "scale_down" {
-  name = "${var.project_name}-scale-down"
-  scaling_adjustment = -1
-  adjustment_type = "ChangeInCapacity"
-  cooldown = 300
+  name                   = "${var.project_name}-scale-down"
+  scaling_adjustment     = -1
+  adjustment_type        = "ChangeInCapacity"
+  cooldown               = 300
   autoscaling_group_name = aws_autoscaling_group.web.name
 }
 
 # CloudWatch alarms
 resource "aws_cloudwatch_metric_alarm" "high_cpu" {
-  alarm_name = "${var.project_name}-high-cpu"
+  alarm_name          = "${var.project_name}-high-cpu"
   comparison_operator = "GreaterThanOrEqualToThreshold"
-  evaluation_periods = "2"
-  metric_name = "CPUUtilization"
-  namespace = "AWS/EC2"
-  period = "120"
-  statistic = "Average"
-  threshold = "80"
-  alarm_description = "This monitors high EC2 CPU usage"
-  alarm_actions = [aws_autoscaling_policy.scale_up.arn]
+  evaluation_periods  = "2"
+  metric_name         = "CPUUtilization"
+  namespace           = "AWS/EC2"
+  period              = "120"
+  statistic           = "Average"
+  threshold           = "80"
+  alarm_description   = "This monitors high EC2 CPU usage"
+  alarm_actions       = [aws_autoscaling_policy.scale_up.arn]
 
   dimensions = {
     AutoScalingGroupName = aws_autoscaling_group.web.name
@@ -288,16 +288,16 @@ resource "aws_cloudwatch_metric_alarm" "high_cpu" {
 }
 
 resource "aws_cloudwatch_metric_alarm" "low_cpu" {
-  alarm_name = "${var.project_name}-low-cpu"
+  alarm_name          = "${var.project_name}-low-cpu"
   comparison_operator = "LessThanOrEqualToThreshold"
-  evaluation_periods = "2"
-  metric_name = "CPUUtilization"
-  namespace = "AWS/EC2"
-  period = "120"
-  statistic = "Average"
-  threshold = "30"
-  alarm_description = "This metric monitors low EC2 CPU utilization"
-  alarm_actions = [aws_autoscaling_policy.scale_down.arn]
+  evaluation_periods  = "2"
+  metric_name         = "CPUUtilization"
+  namespace           = "AWS/EC2"
+  period              = "120"
+  statistic           = "Average"
+  threshold           = "30"
+  alarm_description   = "This metric monitors low EC2 CPU utilization"
+  alarm_actions       = [aws_autoscaling_policy.scale_down.arn]
 
   dimensions = {
     AutoScalingGroupName = aws_autoscaling_group.web.name
@@ -306,29 +306,29 @@ resource "aws_cloudwatch_metric_alarm" "low_cpu" {
 
 # RDS db
 resource "aws_db_subnet_group" "default" {
-  name = "${var.project_name}-db-subnet-group"
+  name       = "${var.project_name}-db-subnet-group"
   subnet_ids = module.vpc.private_subnets
-  
+
   tags = var.tags
 }
 
 resource "aws_db_instance" "default" {
-  allocated_storage = 20
-  db_name = var.db_name
-  engine = "mysql"
-  engine_version = "8.0"
-  instance_class = var.db_instance_class
-  username = var.db_username
-  password = var.db_password
-  parameter_group_name = "default.mysql8.0"
-  skip_final_snapshot = true
+  allocated_storage      = 20
+  db_name                = var.db_name
+  engine                 = "mysql"
+  engine_version         = "8.0"
+  instance_class         = var.db_instance_class
+  username               = var.db_username
+  password               = var.db_password
+  parameter_group_name   = "default.mysql8.0"
+  skip_final_snapshot    = true
   vpc_security_group_ids = [aws_security_group.db.id]
-  db_subnet_group_name = aws_db_subnet_group.default.name
+  db_subnet_group_name   = aws_db_subnet_group.default.name
 
   tags = var.tags
 }
 
-# Aseets S3 Bucket
+# Assets S3 Bucket
 resource "aws_s3_bucket" "assets" {
   bucket = var.assets_bucket_name
 
@@ -338,30 +338,31 @@ resource "aws_s3_bucket" "assets" {
 resource "aws_s3_bucket_public_access_block" "assets" {
   bucket = aws_s3_bucket.assets.id
 
-  block_public_acls = true
-  block_public_policy = true
-  ignore_public_acls = true
+  block_public_acls       = true
+  block_public_policy     = true
+  ignore_public_acls      = true
   restrict_public_buckets = true
 }
 
 # Create CloudFront distribution for serving assets from S3
 resource "aws_cloudfront_distribution" "assets" {
+  enabled             = true
+  is_ipv6_enabled     = true
+  default_root_object = "index.html"
+  price_class         = "PriceClass_100"
+
   origin {
     domain_name = aws_s3_bucket.assets.bucket_regional_domain_name
-    origin_id = "S3-${aws_s3_bucket.assets.bucket}"
+    origin_id   = "S3-${aws_s3_bucket.assets.bucket}"
 
     s3_origin_config {
       origin_access_identity = aws_cloudfront_origin_access_identity.assets.cloudfront_access_identity_path
     }
   }
 
-  enabled = true
-  is_ipv6_enabled = true
-  default_root_object = "index.html"
-
   default_cache_behavior {
-    allowed_methods = ["GET", "HEAD", "OPTIONS"]
-    cached_methods = ["GET", "HEAD"]
+    allowed_methods  = ["GET", "HEAD", "OPTIONS"]
+    cached_methods   = ["GET", "HEAD"]
     target_origin_id = "S3-${aws_s3_bucket.assets.bucket}"
 
     forwarded_values {
@@ -372,12 +373,10 @@ resource "aws_cloudfront_distribution" "assets" {
     }
 
     viewer_protocol_policy = "redirect-to-https"
-    min_ttl = 0
-    default_ttl = 3600
-    max_ttl = 86400
+    min_ttl                = 0
+    default_ttl            = 3600
+    max_ttl                = 86400
   }
-
-  price_class = "PriceClass_100"
 
   restrictions {
     geo_restriction {
@@ -401,15 +400,15 @@ resource "aws_s3_bucket_policy" "assets" {
   bucket = aws_s3_bucket.assets.id
   policy = jsonencode({
     Version = "2012-10-17",
-    Id = "PolicyForCloudFrontPrivateContent",
+    Id      = "PolicyForCloudFrontPrivateContent",
     Statement = [
       {
-        Sid = "AllowCloudFrontServicePrincipal",
+        Sid    = "AllowCloudFrontServicePrincipal",
         Effect = "Allow",
         Principal = {
           Service = "cloudfront.amazonaws.com"
         },
-        Action = "s3:GetObject",
+        Action   = "s3:GetObject",
         Resource = "${aws_s3_bucket.assets.arn}/*",
         Condition = {
           StringEquals = {
@@ -451,8 +450,8 @@ resource "aws_iam_policy" "instance_policy" {
     Statement = [
       {
         # Required for CloudWatch Agent/Logs
-        Effect = "Allow",
-        Action = [
+        Effect   = "Allow",
+        Action   = [
           "logs:CreateLogGroup",
           "logs:CreateLogStream",
           "logs:PutLogEvents",
@@ -462,8 +461,8 @@ resource "aws_iam_policy" "instance_policy" {
       },
       {
         # Recommended for SSM Agent & Session Manager
-        Effect = "Allow",
-        Action = [
+        Effect   = "Allow",
+        Action   = [
           "ssm:UpdateInstanceInformation",
           "ssmmessages:CreateControlChannel",
           "ssmmessages:CreateDataChannel",
@@ -474,13 +473,13 @@ resource "aws_iam_policy" "instance_policy" {
       },
       {
         # Required for SSM Get Parameters
-         Effect = "Allow",
-         Action = [
-            "ssm:GetParameter",
-            "ssm:GetParameters",
-            "ssm:GetParametersByPath"
-         ],
-         Resource = "arn:aws:ssm:${var.aws_region}:${data.aws_caller_identity.current.account_id}:parameter/*" # Adjust path if needed
+        Effect = "Allow",
+        Action = [
+          "ssm:GetParameter",
+          "ssm:GetParameters",
+          "ssm:GetParametersByPath"
+        ],
+        Resource = "arn:aws:ssm:${var.aws_region}:${data.aws_caller_identity.current.account_id}:parameter/*" # Adjust path if needed
       },
       {
         # Required to fetch DB creds from Secrets Manager
@@ -520,20 +519,20 @@ resource "aws_iam_instance_profile" "instance_profile" {
 # Route53
 resource "aws_route53_zone" "main" {
   count = var.create_route53_zone ? 1 : 0
-  name = var.domain_name
+  name  = var.domain_name
 
   tags = var.tags
 }
 
 resource "aws_route53_record" "www" {
-  count = var.create_route53_zone ? 1 : 0
+  count   = var.create_route53_zone ? 1 : 0
   zone_id = aws_route53_zone.main[0].zone_id
-  name = "www.${var.domain_name}"
-  type = "A"
+  name    = "www.${var.domain_name}"
+  type    = "A"
 
   alias {
-    name = aws_lb.app.dns_name
-    zone_id = aws_lb.app.zone_id
+    name                   = aws_lb.app.dns_name
+    zone_id                = aws_lb.app.zone_id
     evaluate_target_health = true
   }
 }
@@ -542,33 +541,34 @@ resource "aws_route53_record" "cert_validation" {
   # Create one validation record per domain/SAN defined in the certificate
   for_each = {
     for dvo in aws_acm_certificate.cert.domain_validation_options : dvo.domain_name => {
-      name = dvo.resource_record_name
-      record = dvo.resource_record_value
-      type = dvo.resource_record_type
-      zone_id = var.create_route53_zone ? aws_route53_zone.main[0].zone_id : data.aws_route53_zone.existing[0].zone_id 
+      name    = dvo.resource_record_name
+      record  = dvo.resource_record_value
+      type    = dvo.resource_record_type
+      zone_id = var.create_route53_zone ? aws_route53_zone.main[0].zone_id : data.aws_route53_zone.existing[0].zone_id
     }
   }
 
   # Required if var.create_route53_zone = false
   allow_overwrite = true
-  name = each.value.name
-  records = [each.value.record]
-  ttl = 60
-  type = each.value.type
-  zone_id = each.value.zone_id
+  name            = each.value.name
+  records         = [each.value.record]
+  ttl             = 60
+  type            = each.value.type
+  zone_id         = each.value.zone_id
 }
 
 # Alternative: Data source if Route 53 Zone exists but isn't managed by this TF state
 data "aws_route53_zone" "existing" {
-  count = !var.create_route53_zone ? 1 : 0 
-  name = var.domain_name
+  count = !var.create_route53_zone ? 1 : 0
+  name  = var.domain_name
+
   private_zone = false
 }
 
 # Wait for Certificate Validation to Complete
 resource "aws_acm_certificate_validation" "cert" {
+  certificate_arn         = aws_acm_certificate.cert.arn
   validation_record_fqdns = [for record in aws_route53_record.cert_validation : record.fqdn]
-  certificate_arn = aws_acm_certificate.cert.arn
 
   # Add timeout if needed
   # timeouts {
@@ -579,17 +579,17 @@ resource "aws_acm_certificate_validation" "cert" {
 # Output
 output "alb_dns_name" {
   description = "The DNS name of the load balancer"
-  value = aws_lb.app.dns_name
+  value       = aws_lb.app.dns_name
 }
 
 output "cloudfront_domain_name" {
   description = "The domain name of the CloudFront distribution"
-  value = aws_cloudfront_distribution.assets.domain_name
+  value       = aws_cloudfront_distribution.assets.domain_name
 }
 
 output "rds_endpoint" {
   description = "The connection endpoint for the RDS instance"
-  value = aws_db_instance.default.endpoint
+  value       = aws_db_instance.default.endpoint
 }
 
 output "acm_certificate_arn" {
