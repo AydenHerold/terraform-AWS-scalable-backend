@@ -5,7 +5,7 @@ provider "aws" {
 # VPC w/ subnets across multiple AZs
 module "vpc" {
   source  = "terraform-aws-modules/vpc/aws"
-  version = "~> 3.0"
+  version = "~> 5.0"
 
   name = "${var.project_name}-vpc"
   cidr = var.vpc_cidr
