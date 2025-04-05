@@ -211,6 +211,7 @@ resource "aws_launch_template" "web" {
     echo "Instance setup complete (placeholder)" > /var/www/html/index.html
   EOF
   )
+
   tag_specifications {
     resource_type = "instance"
     tags          = merge(var.tags, { Name = "${var.project_name}-web" })
