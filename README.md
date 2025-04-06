@@ -34,10 +34,43 @@ This Terraform configuration creates the following core components:
     *   Route 53 DNS records for the domain and ACM validation (if `enable_domain_features` is true). Supports creating a new Route 53 zone or using an existing one.
 
 **(Optional but Recommended) Architecture Diagram:**
-[Internet] -> [Route 53 (Optional)] -> [ALB (Public Subnets)] -> [EC2 Instances (ASG - Private Subnets)] -> [RDS DB (Private Subnets)]
-| ^
-| | (Assets)
-+--------------------------------------> [CloudFront] -> [S3 Bucket]
+                   +-----------------------+
+                   |       Internet        |
+                   +-----------+-----------+
+                               |
+                               v
+                +----------------------------+
+                | Route 53 (Optional - DNS)  |
+                +----------------------------+
+                               |
+                               v
+                +----------------------------+
+                |  Application Load Balancer |
+                |   (Public Subnets)         |
+                +------------+---------------+
+                             |
+                             v
+                   +-------------------+
+                   |   EC2 Instances   |
+                   |  (Auto Scaling)   |
+                   | (Private Subnets) |
+                   +--------+----------+
+                            |
+                            v
+                     +-------------+
+                     |    RDS      |
+                     |  Database   |
+                     | (Private)   |
+                     +-------------+
+
+[User Browser]
+       |
+       v
++---------------+       +------------------+
+|   CloudFront  | <-->  |     S3 Bucket    |
+| (Edge Loc.)   |       |  (Private via    |
++---------------+       | Origin Access ID)|
+                        +------------------+
 
 
 ## Features
