@@ -1,228 +1,171 @@
-Okay, here is the revised README.md with the Prerequisites section updated to clarify the GitHub Actions configuration, reflecting the need for AWS_REGION regardless of the authentication method used.
+# Terraform AWS Web Application Infrastructure
 
-# Terraform AWS Scalable Backend Infrastructure
-
-This project provisions a scalable and resilient backend infrastructure on AWS using Terraform. It sets up a multi-tier architecture suitable for deploying web applications like blogs, forums, or e-commerce platforms, focusing on high availability, scalability, and automation.
-
-**Note:** This Terraform code deploys the *infrastructure* components (networking, servers, database, load balancer, etc.). It includes a basic CI/CD pipeline via GitHub Actions for infrastructure deployment and a placeholder for frontend asset deployment. The actual *backend application deployment* to the EC2 instances needs to be implemented separately within the CI/CD pipeline or instance user data.
-
-## Features
-
-*   **High Availability:**
-    *   VPC spanning multiple Availability Zones (AZs).
-    *   Public and Private Subnets across AZs.
-    *   Application Load Balancer (ALB) distributing traffic across AZs.
-    *   Auto Scaling Group (ASG) maintaining desired instance count across AZs.
-    *   RDS Database Instance configured for Multi-AZ deployment.
-*   **Scalability:**
-    *   Auto Scaling Group automatically adjusts the number of EC2 instances based on CPU load (configurable).
-    *   Application Load Balancer handles varying traffic loads.
-*   **Security:**
-    *   Resources deployed within a custom VPC.
-    *   Network segmentation using Public and Private Subnets.
-    *   Security Groups restricting traffic between tiers (ALB -> Web, Web -> DB).
-    *   HTTPS enforced on the Application Load Balancer using AWS Certificate Manager (ACM).
-    *   Dedicated IAM Role for EC2 instances with least-privilege permissions for accessing necessary AWS services (CloudWatch, SSM, Secrets Manager).
-    *   Private S3 Bucket for static assets, served securely via CloudFront Origin Access Identity (OAI).
-*   **Automation:**
-    *   Infrastructure defined as code using Terraform.
-    *   CI/CD pipeline using GitHub Actions for automated Terraform deployment (`plan` on PR, `apply` on merge to `main`).
-*   **Managed Services:**
-    *   AWS RDS for managed relational database (MySQL).
-    *   AWS S3 & CloudFront for scalable and secure static asset hosting.
-    *   AWS Route 53 for DNS management.
-    *   AWS Certificate Manager (ACM) for SSL/TLS certificates.
+This repository contains Terraform code to provision a scalable and highly available web application infrastructure on AWS. It includes networking, compute, database, load balancing, CDN, security, and optional DNS/HTTPS configuration.
 
 ## Architecture Overview
 
-1.  **DNS:** (Optional) Route 53 manages the domain's DNS records.
-2.  **User Traffic:** Hits Route 53, which resolves to the Application Load Balancer (ALB).
-3.  **Load Balancer (ALB):**
-    *   Listens on HTTPS (port 443) using an ACM certificate.
-    *   Redirects HTTP (port 80) traffic to HTTPS.
-    *   Distributes incoming traffic across healthy EC2 instances in the private subnets.
-    *   Resides in public subnets.
-4.  **Compute (EC2 Auto Scaling Group):**
-    *   EC2 instances run the backend application.
-    *   Launched from a Launch Template which specifies the AMI, instance type, security group, and **IAM Instance Profile**.
-    *   Managed by an Auto Scaling Group spanning multiple AZs within private subnets.
-    *   Scales based on CloudWatch CPU utilization alarms.
-    *   Instances have an IAM Role granting permissions to access CloudWatch Logs, SSM, and Secrets Manager (for retrieving DB credentials securely).
-5.  **Database (RDS):**
-    *   Managed MySQL database instance.
-    *   Deployed in a Multi-AZ configuration for high availability.
-    *   Resides in private subnets.
-    *   Accessible only from the EC2 instances via the Database Security Group.
-6.  **Static Assets (S3 & CloudFront):**
-    *   Application static assets (CSS, JS, images) are stored in a private S3 bucket.
-    *   A CloudFront distribution serves these assets globally, accessing the S3 bucket via an Origin Access Identity (OAI) for security.
-7.  **Networking (VPC):**
-    *   Custom VPC with public and private subnets across multiple AZs.
-    *   NAT Gateways in public subnets allow instances in private subnets to access the internet for updates/external APIs.
-    *   Internet Gateway allows internet access for the ALB and NAT Gateways.
+This Terraform configuration creates the following core components:
 
-*(Suggestion: Include a diagram image here if possible)*
+1.  **VPC:** A custom Virtual Private Cloud (VPC) with public and private subnets spread across multiple Availability Zones (AZs) for high availability.
+2.  **Networking:**
+    *   Internet Gateway for public subnets.
+    *   NAT Gateways (one per AZ) in public subnets to allow outbound internet access for resources in private subnets.
+    *   Route tables for proper traffic routing.
+3.  **Load Balancing:** An Application Load Balancer (ALB) in public subnets to distribute incoming traffic.
+    *   Listens on HTTP (port 80).
+    *   Optionally listens on HTTPS (port 443) if domain features are enabled.
+    *   Redirects HTTP to HTTPS if HTTPS is enabled.
+4.  **Compute:** An Auto Scaling Group (ASG) managing EC2 instances within private subnets.
+    *   Uses a Launch Template to define instance configuration (AMI, instance type, user data, IAM role).
+    *   Scales based on CPU utilization CloudWatch alarms.
+5.  **Database:** An RDS MySQL instance running in private subnets.
+    *   Uses a DB Subnet Group spanning multiple AZs.
+6.  **Static Assets:**
+    *   An S3 bucket for storing static website/application assets (e.g., JS, CSS, images).
+    *   A CloudFront distribution configured to serve assets from the S3 bucket via an Origin Access Identity (OAI), keeping the bucket private.
+7.  **Security:**
+    *   Security Groups to control traffic flow:
+        *   `alb-sg`: Allows HTTP/HTTPS traffic from the internet to the ALB.
+        *   `web-sg`: Allows HTTP traffic from the ALB to the EC2 instances.
+        *   `db-sg`: Allows MySQL traffic (port 3306) from the EC2 instances to the RDS instance.
+    *   IAM Role and Instance Profile for EC2 instances, granting permissions for CloudWatch Logs, SSM (including Session Manager), Parameter Store, and Secrets Manager.
+8.  **DNS & HTTPS (Optional):**
+    *   An ACM Certificate for the specified domain name (if `enable_domain_features` is true).
+    *   Route 53 DNS records for the domain and ACM validation (if `enable_domain_features` is true). Supports creating a new Route 53 zone or using an existing one.
+
+**(Optional but Recommended) Architecture Diagram:**
+[Internet] -> [Route 53 (Optional)] -> [ALB (Public Subnets)] -> [EC2 Instances (ASG - Private Subnets)] -> [RDS DB (Private Subnets)]
+| ^
+| | (Assets)
++--------------------------------------> [CloudFront] -> [S3 Bucket]
+
+
+## Features
+
+*   **High Availability:** Multi-AZ deployment for VPC subnets, ASG, and RDS.
+*   **Scalability:** Auto Scaling Group adjusts capacity based on CPU load.
+*   **Security:** Resources placed in private subnets where possible, with strict Security Group rules. IAM roles follow the principle of least privilege. S3 bucket access restricted via OAI.
+*   **Cost-Effectiveness:** Uses NAT Gateways instead of NAT Instances, option for cost-effective instance types (configurable).
+*   **Automation:** Fully deployable via Terraform.
+*   **CI/CD Integration:** Includes a GitHub Actions workflow for automated testing (plan on PR) and deployment (apply on merge to `main`), including application asset deployment to S3/CloudFront.
+*   **Optional Domain/HTTPS:** Easily enable custom domain names and HTTPS via ACM and Route 53 integration using feature flags (`enable_domain_features`, `create_route53_zone`).
 
 ## Prerequisites
 
-*   **AWS Account:** An AWS account with sufficient permissions to create the resources defined in `main.tf`.
-*   **AWS Credentials (Local):** Configured AWS credentials for running Terraform locally (e.g., via environment variables `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`, `AWS_REGION`, or an AWS credentials file). This is separate from CI/CD authentication.
-*   **Terraform:** Terraform CLI installed (version ~> 1.4 recommended, check `required_version` if specified).
-*   **Registered Domain Name:** A domain name registered with Route 53 or another registrar (required for ACM certificate validation and DNS records).
-*   **Git:** Git installed for cloning the repository.
-*   **(For CI/CD - GitHub Actions):**
-    *   GitHub Repository.
-    *   **Authentication Method (Choose One):**
-        *   **Option A: AWS Access Keys (Simpler Setup, Less Secure)**
-            *   GitHub Secrets:
-                *   `AWS_ACCESS_KEY_ID`: Long-lived Access Key ID for an IAM user.
-                *   `AWS_SECRET_ACCESS_KEY`: Corresponding Secret Access Key.
-        *   **Option B: OpenID Connect (OIDC) (Recommended, More Secure)**
-            *   Setup an IAM OIDC identity provider in your AWS account for GitHub Actions.
-            *   Create an IAM Role with a trust policy allowing GitHub Actions (your repository/branch) to assume it via OIDC.
-            *   GitHub Secret:
-                *   `AWS_ROLE_TO_ASSUME`: The ARN of the IAM Role GitHub Actions should assume.
-    *   **Required GitHub Variables (Repository or Environment level):**
-        *   `AWS_REGION`: The target AWS region (e.g., `us-east-1`). **This is required by the `configure-aws-credentials` action regardless of the authentication method used.**
-        *   `ASSETS_BUCKET_NAME`: The globally unique name for your S3 assets bucket (should match the value in `terraform.tfvars`).
-        *   `CLOUDFRONT_DISTRIBUTION_ID`: **Note:** For the CloudFront invalidation step. It's better practice to obtain this dynamically from Terraform output after the `apply` step, rather than storing as a static variable. The current `deploy.yml` might need adjustment for this best practice.
-    *   **Other GitHub Secrets:**
-        *   `GITHUB_TOKEN`: Usually available automatically, needed for posting plan comments on PRs.
-
-## Project Structure
-content_copy
-download
-Use code with caution.
-Markdown
-terraform-AWS-scalable-backend/
-├── .github/
-│ └── workflows/
-│ └── deploy.yml # GitHub Actions workflow for CI/CD
-├── app/
-│ └── [your application code] # Placeholder for application source
-├── main.tf # Main Terraform configuration defining resources
-├── variables.tf # Input variable definitions
-├── terraform.tfvars # Variable values (Customize this!)
-├── README.md # This file
-└── (Optional) outputs.tf # Output variable definitions
-└── (Optional) scripts/ # Helper scripts (e.g., for user_data)
+1.  **Terraform:** Install Terraform (version specified in `deploy.yml` or compatible).
+2.  **AWS Account:** An active AWS account.
+3.  **AWS Credentials:** Configure AWS credentials locally (e.g., via `~/.aws/credentials`, environment variables) for manual deployment *OR* set up OIDC for the GitHub Actions workflow (see CI/CD section).
+4.  **Route 53 Hosted Zone (Optional):** If using `enable_domain_features = true` and `create_route53_zone = false`, you need an existing public Route 53 hosted zone for your domain in your AWS account.
+5.  **GitHub Secrets & Variables (for CI/CD):**
+    *   `AWS_ROLE_TO_ASSUME`: (Secret) The ARN of the IAM Role GitHub Actions will assume via OIDC.
+    *   `DB_PASSWORD`: (Secret) The password for the RDS database administrator user.
+    *   `AWS_REGION`: (Variable) The AWS region to deploy to (e.g., `us-east-1`).
+    *   `ASSETS_BUCKET_NAME`: (Variable) The name of the S3 bucket for static assets (must match `assets_bucket_name` in `terraform.tfvars`).
+    *   `CLOUDFRONT_DISTRIBUTION_ID`: (Variable) The ID of the CloudFront distribution created by Terraform (Needed for cache invalidation). You might need to run Terraform once to get this ID and then add it as a variable.
 
 ## Configuration
 
 1.  **Clone the repository:**
     ```bash
-    git clone https://github.com/AydenHerold/terraform-AWS-scalable-backend.git
-    cd terraform-AWS-scalable-backend
+    git clone <your-repo-url>
+    cd <your-repo-directory>
     ```
-2.  **Customize Variables:**
-    *   Rename `terraform.tfvars.example` to `terraform.tfvars` (if applicable) or edit the existing `terraform.tfvars`.
-    *   Update the placeholder values in `terraform.tfvars` with your specific settings:
-        *   `aws_region`
-        *   `project_prefix` (used to name resources)
-        *   `assets_bucket_name` (must be globally unique)
-        *   `domain_name` (your registered domain)
-        *   `db_name`
-        *   `tags` (Environment, Project, Owner etc.)
-    *   **Important:** For sensitive variables like `db_password` and `db_username`:
-        *   **Do not commit them directly to `terraform.tfvars` in a real project.**
-        *   Set them using environment variables (`export TF_VAR_db_password="yourpassword"`) before running Terraform locally.
-        *   **Recommended:** Integrate with AWS Secrets Manager. Modify the Terraform code (`aws_db_instance`) to *not* accept these variables directly, and update the EC2 `user_data` script (and application code) to fetch secrets from Secrets Manager using the assigned EC2 IAM Role.
+2.  **Configure Variables:**
+    *   Create a `terraform.tfvars` file (or modify the existing one).
+    *   **Required Variables:**
+        *   `project_name`: A unique, lowercase name prefix for your resources (e.g., `my-app-prod`).
+        *   `assets_bucket_name`: A globally unique name for the S3 assets bucket.
+        *   `db_name`: The name for the database inside the RDS instance.
+        *   `db_username`: The administrator username for the RDS instance.
+        *   `db_password`: The administrator password for the RDS instance. **It is strongly recommended to manage this via environment variables or secrets management, not hardcoded in `.tfvars` for production.** See the CI/CD section for handling this in GitHub Actions. For local runs, use `TF_VAR_db_password="yourpassword" terraform apply`.
+    *   **Optional Domain/HTTPS:**
+        *   To enable HTTPS and custom domain features, set `enable_domain_features = true`.
+        *   Set `domain_name` to your desired domain (e.g., `"myapp.example.com"`).
+        *   If you want Terraform to create a *new* Route 53 public hosted zone for this domain, set `create_route53_zone = true`.
+        *   If you already have a Route 53 public hosted zone for this domain in your AWS account and want Terraform to use it (for creating ALB/validation records), keep `create_route53_zone = false`.
+    *   **Other Variables:** Review `variables.tf` and override defaults in `terraform.tfvars` as needed (e.g., `aws_region`, `instance_type`, `ami_id`, `db_instance_class`, `tags`). Ensure `ami_id` is valid for your chosen `aws_region`.
 
-3.  **GitHub Actions Secrets/Variables:** Configure the required secrets and variables in your GitHub repository settings (under "Settings" -> "Secrets and variables" -> "Actions") based on your chosen authentication method and the requirements listed in the **Prerequisites** section.
+## Deployment
 
-## Usage / Deployment
-
-### Manual Deployment (Local)
+### Manual Deployment
 
 1.  **Initialize Terraform:**
     ```bash
     terraform init
     ```
-2.  **Plan:** Review the infrastructure changes Terraform proposes.
+2.  **Plan Deployment:** Review the changes Terraform will make.
     ```bash
+    # Use -var-file if you didn't name it terraform.tfvars
+    terraform plan -var-file=terraform.tfvars
+
+    # If setting password via env var:
+    export TF_VAR_db_password="your-secure-password"
     terraform plan -var-file=terraform.tfvars
     ```
-3.  **Apply:** Create or update the infrastructure.
+3.  **Apply Changes:** Provision the infrastructure.
     ```bash
+    # Use -var-file if you didn't name it terraform.tfvars
+    # You will be prompted for the password if not set via env var
     terraform apply -var-file=terraform.tfvars
-    # Or: terraform apply -var-file=terraform.tfvars -auto-approve (Use with caution)
+
+    # If setting password via env var:
+    export TF_VAR_db_password="your-secure-password"
+    terraform apply -var-file=terraform.tfvars -auto-approve # Use -auto-approve cautiously
     ```
 
-### Automated Deployment (GitHub Actions)
+### CI/CD Deployment (GitHub Actions)
 
-*   **Pull Requests:** When a PR is opened against the `main` branch, the `deploy.yml` workflow will run `terraform init`, `validate`, and `plan`. The plan output will be posted as a comment on the PR for review.
-*   **Merge to `main`:** When changes are pushed or merged to the `main` branch, the workflow will run `terraform init`, `validate`, and `apply -auto-approve` to deploy the infrastructure changes. It will then attempt to sync the `app/build` directory (assuming a frontend build process) to the S3 assets bucket and invalidate the CloudFront cache. **Note:** Backend deployment logic is missing here.
+This repository includes a `.github/workflows/deploy.yml` workflow:
 
-## Infrastructure Components Provisioned
+1.  **Setup OIDC:** Configure AWS IAM OIDC identity provider for GitHub Actions. Create an IAM Role that the GitHub Actions workflow can assume (`AWS_ROLE_TO_ASSUME`). This role needs permissions to manage all the resources defined in the Terraform code and permissions for the `deploy-app` job (S3 PutObject, DeleteObject, ListBucket; CloudFront CreateInvalidation).
+2.  **Configure Secrets & Variables:** Add the required secrets (`AWS_ROLE_TO_ASSUME`, `DB_PASSWORD`) and variables (`AWS_REGION`, `ASSETS_BUCKET_NAME`, `CLOUDFRONT_DISTRIBUTION_ID`) to your GitHub repository settings.
+3.  **Workflow:**
+    *   **On Pull Request (to `main`):** The workflow runs `terraform init`, `validate`, and `plan`. The plan output is posted as a comment on the PR.
+    *   **On Push (to `main`):** The workflow runs `terraform init`, `validate`, and `terraform apply -auto-approve`, deploying the infrastructure changes. It then runs the `deploy-app` job.
+4.  **Application Deployment (`deploy-app` Job):** After a successful `terraform apply` on the `main` branch, this job:
+    *   Checks out the code.
+    *   Sets up Node.js (assuming a Node.js frontend project in `./app`).
+    *   Installs dependencies (`npm ci` in `./app`).
+    *   Builds the application (`npm run build` in `./app`).
+    *   Syncs the contents of `./app/build` to the S3 assets bucket specified by the `ASSETS_BUCKET_NAME` variable.
+    *   Creates a CloudFront cache invalidation for `/*` on the distribution specified by `CLOUDFRONT_DISTRIBUTION_ID`.
 
-*   **Networking:**
-    *   `aws_vpc` (using `terraform-aws-modules/vpc/aws`)
-    *   Public & Private Subnets across multiple AZs
-    *   Internet Gateway
-    *   NAT Gateways (one per AZ)
-    *   Route Tables
-*   **Security:**
-    *   `aws_security_group` (ALB, Web Servers, Database)
-    *   `aws_iam_role` (for EC2 instances)
-    *   `aws_iam_policy` (custom policy for EC2 role)
-    *   `aws_iam_instance_profile` (for EC2 instances)
-    *   `aws_s3_bucket_policy` (for CloudFront access)
-    *   `aws_s3_bucket_public_access_block`
-*   **Load Balancing:**
-    *   `aws_lb` (Application Load Balancer)
-    *   `aws_lb_target_group`
-    *   `aws_lb_listener` (HTTP redirect to HTTPS)
-    *   `aws_lb_listener` (HTTPS listener)
-*   **Compute:**
-    *   `aws_launch_template` (includes IAM profile, user data placeholder)
-    *   `aws_autoscaling_group`
-    *   `aws_autoscaling_policy` (Scale Up/Down)
-    *   `aws_cloudwatch_metric_alarm` (CPU High/Low for scaling)
-*   **Database:**
-    *   `aws_db_instance` (RDS MySQL, Multi-AZ)
-    *   `aws_db_subnet_group`
-*   **Storage & CDN:**
-    *   `aws_s3_bucket` (for static assets)
-    *   `aws_cloudfront_origin_access_identity`
-    *   `aws_cloudfront_distribution`
-*   **DNS & Certificates:**
-    *   `aws_acm_certificate`
-    *   `aws_route53_record` (for ACM validation)
-    *   `aws_acm_certificate_validation`
-    *   (Optional) `aws_route53_zone`
-    *   `aws_route53_record` (A records for ALB - apex/www)
+## Resources Created
+
+*   AWS VPC and associated networking components (Subnets, Route Tables, IGW, NAT Gateways)
+*   AWS Application Load Balancer (ALB), Target Group, Listeners (HTTP/HTTPS)
+*   AWS Auto Scaling Group (ASG), Launch Template
+*   AWS EC2 Instances (managed by ASG)
+*   AWS Security Groups (ALB, Web, DB)
+*   AWS RDS DB Instance, DB Subnet Group
+*   AWS S3 Bucket (for static assets)
+*   AWS CloudFront Distribution, Origin Access Identity (OAI)
+*   AWS IAM Role, Instance Profile, Policy (for EC2 instances)
+*   AWS CloudWatch Metric Alarms (for ASG scaling)
+*   AWS ACM Certificate (Conditional)
+*   AWS Route 53 Hosted Zone (Conditional)
+*   AWS Route 53 Records (Conditional)
+
+## Outputs
+
+After successful deployment, Terraform will output:
+
+*   `alb_dns_name`: The public DNS name of the Application Load Balancer.
+*   `application_url`: The primary URL to access the application (HTTPS if domain enabled, HTTP otherwise).
+*   `cloudfront_domain_name`: The domain name of the CloudFront distribution (for accessing static assets).
+*   `rds_endpoint`: The connection endpoint for the RDS database instance.
+*   `acm_certificate_arn`: ARN of the ACM certificate (if created).
+*   `instance_profile_name`: Name of the IAM Instance Profile attached to EC2 instances.
 
 ## Security Considerations
 
-*   **HTTPS:** Enforced at the ALB level using ACM certificates.
-*   **Least Privilege:** Security Groups restrict traffic between tiers. EC2 instances use an IAM role with specific permissions needed for AWS service interaction.
-*   **Secrets Management:** Database credentials should ideally be managed via AWS Secrets Manager and fetched by the application using the EC2 IAM role (requires modification of `user_data`/application logic). Avoid storing sensitive data directly in Terraform state or variables files.
-*   **Private Resources:** EC2 instances and the RDS database are placed in private subnets, inaccessible directly from the internet.
-*   **S3 Security:** The assets bucket is private, only accessible via CloudFront OAI.
+*   **Secrets Management:** The `db_password` is sensitive. Avoid committing it directly. Use environment variables for local testing (`TF_VAR_db_password`) and GitHub Secrets for CI/CD. Consider using AWS Secrets Manager to store the DB password and retrieve it within the EC2 instance's user data/application code using the provided IAM role.
+*   **IAM Permissions:** The IAM role for EC2 instances grants access to CloudWatch Logs, SSM, Parameter Store, and Secrets Manager. Review and restrict resource ARNs in the `aws_iam_policy.instance_policy` where possible (especially for Secrets Manager).
+*   **Security Groups:** Ingress rules are restricted (e.g., DB only accepts traffic from the Web SG). Review CIDR blocks (e.g., ALB ingress) and tighten if possible based on your needs.
+*   **S3 Bucket Security:** The assets bucket is private, accessible only via CloudFront using OAI. Public access is explicitly blocked.
+*   **User Data:** The `user_data` in the launch template is a basic placeholder. Ensure your actual user data script securely handles application setup, configuration fetching (e.g., DB credentials from Secrets Manager), and service startup.
 
-## Monitoring
+## Notes
 
-*   Basic CloudWatch Alarms are configured for ASG CPU utilization to trigger scaling.
-*   **TODO:** Enhance monitoring by:
-    *   Installing and configuring the CloudWatch Agent on EC2 instances (via `user_data`) to collect detailed metrics (Memory, Disk) and logs (application, system).
-    *   Creating CloudWatch Log Groups.
-    *   Adding more CloudWatch Alarms (e.g., Memory, Disk, ALB 5xx errors, Target Group health, RDS metrics).
-    *   Creating CloudWatch Dashboards or integrating with tools like Grafana.
-
-## Cleanup
-
-To destroy all the infrastructure managed by this Terraform configuration:
-
-```bash
-terraform destroy -var-file=terraform.tfvars
-```
-**Warning: This will permanently delete all the AWS resources created by this project. Be absolutely sure before running this command.**
-
-TODO / Future Improvements
-Backend Application Deployment: Implement a robust deployment strategy within the deploy-app job in deploy.yml (e.g., using AWS CodeDeploy, Packer AMIs, or another method) to deploy the code from app/ onto the EC2 instances.
-Secrets Management Integration: Fully implement AWS Secrets Manager for database credentials, removing them from Terraform variables and updating user_data/application logic.
-User Data Enhancement: Create a proper user_data script (potentially in the scripts/ directory) to install dependencies, configure the CloudWatch agent, fetch secrets, and start the application.
-Enhanced Monitoring & Logging: Implement the monitoring suggestions above.
-WAF: Consider adding AWS WAF to the Application Load Balancer for protection against common web exploits.
-CI/CD Dynamic Values: Modify deploy.yml to dynamically fetch outputs like the CloudFront Distribution ID from Terraform instead of relying on static GitHub variables.
-State Management: Configure Terraform remote state (e.g., using an S3 backend with DynamoDB locking) for team collaboration and state protection. Add backend.tf.
+*   **EC2 User Data:** The `user_data` script in `aws_launch_template.web` is a placeholder. You **must** replace it with your actual application deployment and configuration steps (e.g., installing dependencies, fetching code, configuring environment variables, starting the application server, installing CloudWatch Agent).
+*   **Application Code:** This Terraform setup provisions the infrastructure. You need a separate process to deploy your application code *onto* the EC2 instances (e.g., via User Data, CodeDeploy, Packer+AMI). The CI/CD workflow includes deployment of *static frontend assets* to S3/CloudFront, but not the backend application code to EC2.
