@@ -152,7 +152,31 @@ resource "aws_lb_target_group" "app" {
   tags = var.tags
 }
 
-#HTTPS Listener
+# HTTP Listener
+resource "aws_lb_listener" "http" {
+  load_balancer_arn = aws_lb.app.arn
+  port              = 80
+  protocol          = "HTTP"
+
+  # CONDITIONAL Default Action
+  default_action {
+    # If domain features are enabled (meaning HTTPS listener will exist), redirect to HTTPS.
+    # Otherwise (if only HTTP is available), forward directly to the target group.
+    type = var.enable_domain_features ? "redirect" : "forward"
+
+    # Only include 'redirect' block if redirecting
+    dynamic "redirect" {
+      for_each = var.enable_domain_features ? [1] : []
+      content {
+        port        = "443"
+        protocol    = "HTTPS"
+        status_code = "HTTP_301"
+      }
+    }
+    target_group_arn = var.enable_domain_features ? null : aws_lb_target_group.app.arn
+  }
+}
+
 resource "aws_lb_listener" "https" {
   count = var.enable_domain_features ? 1 : 0 # CONDITIONAL
 
@@ -166,13 +190,6 @@ resource "aws_lb_listener" "https" {
   default_action {
     type             = "forward"
     target_group_arn = aws_lb_target_group.app.arn
-  }
-
-  # Implicit dependency on aws_acm_certificate_validation.cert[0] via certificate_arn
-}
-
-    # Only include 'target_group_arn' if forwarding directly from HTTP
-    target_group_arn = var.enable_domain_features ? null : aws_lb_target_group.app.arn
   }
 }
 
