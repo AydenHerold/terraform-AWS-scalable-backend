@@ -5,9 +5,13 @@ variable "aws_region" {
 }
 
 variable "project_name" {
-  description = "Name prefix for all resources"
+  description = "Lowercase name prefix for all resources (e.g., 'appname-env')"
   type        = string
-  default     = "APPNAME-ENV"
+  default     = "appname-env"
+  validation {
+    condition     = lower(var.project_name) == var.project_name
+    error_message = "The project_name must be all lowercase."
+  }
 }
 
 variable "vpc_cidr" {
