@@ -1,10 +1,10 @@
 # terraform.tfvars
 
-aws_region = "us-east-1"
-project_name = "my-web-app-dev" # Example: MUST BE LOWERCASE
+aws_region         = "us-east-1"
+project_name       = "my-web-app-dev" # Example: MUST BE LOWERCASE
 assets_bucket_name = "my-web-app-dev-assets"
-db_name     = "webappdb" 
-db_username = "dbadmin" 
+db_name            = "webappdb"
+db_username        = "dbadmin"
 
 # --- Optional Domain Features (Defaults to disabled) ---
 # enable_domain_features = false # (Default) Keep domain/HTTPS features off
@@ -23,9 +23,9 @@ db_username = "dbadmin"
 
 # --- Tags ---
 tags = {
-  Environment = "development"         # E.g., production, staging, development
-  Project     = "MyWebApp"            # E.g., Name of the overall project
-  Owner       = "WebAppTeam"          # E.g., Team or Individual responsible
+  Environment = "development" # E.g., production, staging, development
+  Project     = "MyWebApp"    # E.g., Name of the overall project
+  Owner       = "WebAppTeam"  # E.g., Team or Individual responsible
   Terraform   = "true"
 }
 
