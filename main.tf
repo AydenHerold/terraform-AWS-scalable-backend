@@ -58,15 +58,15 @@ resource "aws_security_group" "alb" {
 
 # Request an ACM Certificate (Needs Route 53 zone)
 resource "aws_acm_certificate" "cert" {
-  # Assumes the domain name variable is for the apex or www, adjust if needed
-  domain_name = var.domain_name
-  # Add SANs if needed, e.g., www.
+  count = var.enable_domain_features ? 1 : 0
+
+  domain_name               = var.domain_name
   subject_alternative_names = ["www.${var.domain_name}"]
   validation_method         = "DNS"
 
-  # Requires the Route 53 Zone to exist first if managing via TF
-  # If zone is created conditionally, this needs to handle the count
-  depends_on = [aws_route53_zone.main]
+  # depends_on is implicitly handled by referencing the zone if created,
+  # or handled by the validation resource needing the records.
+  # depends_on = [aws_route53_zone.main] # Remove explicit depends_on here
 
   tags = var.tags
 
@@ -152,36 +152,28 @@ resource "aws_lb_target_group" "app" {
   tags = var.tags
 }
 
-resource "aws_lb_listener" "http" {
-  load_balancer_arn = aws_lb.app.arn
-  port              = 80
-  protocol          = "HTTP"
-
-  default_action {
-    type = "redirect"
-    redirect {
-      port        = "443"
-      protocol    = "HTTPS"
-      status_code = "HTTP_301"
-    }
-  }
-}
-
-# HTTPS Listener
+#HTTPS Listener
 resource "aws_lb_listener" "https" {
+  count = var.enable_domain_features ? 1 : 0 # CONDITIONAL
+
   load_balancer_arn = aws_lb.app.arn
   port              = 443
   protocol          = "HTTPS"
   ssl_policy        = var.alb_ssl_policy
-  certificate_arn   = aws_acm_certificate_validation.cert.certificate_arn # Use validated cert ARN
+  # Reference the conditionally created validation resource
+  certificate_arn   = aws_acm_certificate_validation.cert[0].certificate_arn
 
   default_action {
     type             = "forward"
     target_group_arn = aws_lb_target_group.app.arn
   }
 
-  # Ensure the certificate is validated before attaching the listener
-  depends_on = [aws_acm_certificate_validation.cert]
+  # Implicit dependency on aws_acm_certificate_validation.cert[0] via certificate_arn
+}
+
+    # Only include 'target_group_arn' if forwarding directly from HTTP
+    target_group_arn = var.enable_domain_features ? null : aws_lb_target_group.app.arn
+  }
 }
 
 # Auto Scaling Group
@@ -304,12 +296,11 @@ resource "aws_cloudwatch_metric_alarm" "low_cpu" {
   }
 }
 
-# RDS db
+# DB Subnet Group Name Casing
 resource "aws_db_subnet_group" "default" {
-  name       = "${var.project_name}-db-subnet-group"
+  name       = "${lower(var.project_name)}-db-subnet-group" # Use lower()
   subnet_ids = module.vpc.private_subnets
-
-  tags = var.tags
+  tags       = var.tags
 }
 
 resource "aws_db_instance" "default" {
@@ -518,14 +509,16 @@ resource "aws_iam_instance_profile" "instance_profile" {
 
 # Route53
 resource "aws_route53_zone" "main" {
-  count = var.create_route53_zone ? 1 : 0
-  name  = var.domain_name
+  count = var.enable_domain_features && var.create_route53_zone ? 1 : 0
 
+  name = var.domain_name
   tags = var.tags
 }
 
 resource "aws_route53_record" "www" {
-  count   = var.create_route53_zone ? 1 : 0
+  # Only create if domain features ON *and* user wants TF to create zone
+  count = var.enable_domain_features && var.create_route53_zone ? 1 : 0
+
   zone_id = aws_route53_zone.main[0].zone_id
   name    = "www.${var.domain_name}"
   type    = "A"
@@ -538,18 +531,18 @@ resource "aws_route53_record" "www" {
 }
 
 resource "aws_route53_record" "cert_validation" {
-  # Create one validation record per domain/SAN defined in the certificate
-  for_each = {
-    for dvo in aws_acm_certificate.cert.domain_validation_options : dvo.domain_name => {
+  for_each = var.enable_domain_features ? {
+    # This expression creates a map only if the certificate resource exists (count > 0)
+    for dvo in aws_acm_certificate.cert[0].domain_validation_options : dvo.domain_name => {
       name    = dvo.resource_record_name
       record  = dvo.resource_record_value
       type    = dvo.resource_record_type
+
       zone_id = var.create_route53_zone ? aws_route53_zone.main[0].zone_id : data.aws_route53_zone.existing[0].zone_id
     }
-  }
+  } : {}
 
-  # Required if var.create_route53_zone = false
-  allow_overwrite = true
+  allow_overwrite = true # Still useful if records exist outside TF
   name            = each.value.name
   records         = [each.value.record]
   ttl             = 60
@@ -559,27 +552,36 @@ resource "aws_route53_record" "cert_validation" {
 
 # Alternative: Data source if Route 53 Zone exists but isn't managed by this TF state
 data "aws_route53_zone" "existing" {
-  count = !var.create_route53_zone ? 1 : 0
-  name  = var.domain_name
+  # Only look up if domain features are ON *and* user wants to use existing zone
+  count = var.enable_domain_features && !var.create_route53_zone ? 1 : 0
 
-  private_zone = false # <--- Aligned correctly now
+  name         = var.domain_name
+  private_zone = false
 }
 
 # Wait for Certificate Validation to Complete
 resource "aws_acm_certificate_validation" "cert" {
-  certificate_arn         = aws_acm_certificate.cert.arn
+  count = var.enable_domain_features ? 1 : 0 # CONDITIONAL
+
+  certificate_arn         = aws_acm_certificate.cert[0].arn
+  # This list comprehension works fine - it will be empty if cert_validation creates 0 records
   validation_record_fqdns = [for record in aws_route53_record.cert_validation : record.fqdn]
 
   # Add timeout if needed
   # timeouts {
-  #   create = "15m"
+  #    create = "20m"
   # }
 }
 
 # Output
 output "alb_dns_name" {
-  description = "The DNS name of the load balancer"
+  description = "The public DNS name of the Application Load Balancer."
   value       = aws_lb.app.dns_name
+}
+
+output "application_url" {
+  description = "Primary URL for the application (HTTPS if domain enabled, HTTP otherwise)"
+  value       = var.enable_domain_features ? "https://${var.domain_name}" : "http://${aws_lb.app.dns_name}"
 }
 
 output "cloudfront_domain_name" {
@@ -594,7 +596,7 @@ output "rds_endpoint" {
 
 output "acm_certificate_arn" {
   description = "ARN of the ACM certificate"
-  value       = aws_acm_certificate.cert.arn
+  value       = one(aws_acm_certificate.cert[*].arn)
 }
 
 output "instance_profile_name" {
