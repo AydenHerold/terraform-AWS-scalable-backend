@@ -185,7 +185,7 @@ resource "aws_lb_listener" "https" {
   protocol          = "HTTPS"
   ssl_policy        = var.alb_ssl_policy
   # Reference the conditionally created validation resource
-  certificate_arn   = aws_acm_certificate_validation.cert[0].certificate_arn
+  certificate_arn = aws_acm_certificate_validation.cert[0].certificate_arn
 
   default_action {
     type             = "forward"
@@ -551,9 +551,9 @@ resource "aws_route53_record" "cert_validation" {
   for_each = var.enable_domain_features ? {
     # This expression creates a map only if the certificate resource exists (count > 0)
     for dvo in aws_acm_certificate.cert[0].domain_validation_options : dvo.domain_name => {
-      name    = dvo.resource_record_name
-      record  = dvo.resource_record_value
-      type    = dvo.resource_record_type
+      name   = dvo.resource_record_name
+      record = dvo.resource_record_value
+      type   = dvo.resource_record_type
 
       zone_id = var.create_route53_zone ? aws_route53_zone.main[0].zone_id : data.aws_route53_zone.existing[0].zone_id
     }
@@ -580,7 +580,7 @@ data "aws_route53_zone" "existing" {
 resource "aws_acm_certificate_validation" "cert" {
   count = var.enable_domain_features ? 1 : 0 # CONDITIONAL
 
-  certificate_arn         = aws_acm_certificate.cert[0].arn
+  certificate_arn = aws_acm_certificate.cert[0].arn
   # This list comprehension works fine - it will be empty if cert_validation creates 0 records
   validation_record_fqdns = [for record in aws_route53_record.cert_validation : record.fqdn]
 
