@@ -116,8 +116,20 @@ variable "yourdomain_example_com" {
   default     = "example.com"
 }
 
+variable "enable_domain_features" {
+  description = "Set to true to enable Route 53, ACM certificate, and HTTPS listener creation. Requires a valid 'domain_name'."
+  type        = bool
+  default     = false
+}
+
+variable "domain_name" {
+  description = "The domain name for the application (only used if enable_domain_features is true)"
+  type        = string
+  default     = "example.local"
+}
+
 variable "create_route53_zone" {
-  description = "Whether to create a Route53 zone"
+  description = "Whether to create a Route53 zone (only used if enable_domain_features is true)"
   type        = bool
   default     = false
 }
