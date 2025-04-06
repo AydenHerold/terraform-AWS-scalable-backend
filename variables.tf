@@ -94,11 +94,6 @@ variable "db_instance_class" {
   default     = "db.t3.micro"
 }
 
-variable "YOUR-APP-ENV-assets" {
-  description = "Name of S3 bucket for static assets"
-  type        = string
-}
-
 variable "assets_bucket_name" {
   description = "The name of the S3 bucket for storing assets"
   type        = string
