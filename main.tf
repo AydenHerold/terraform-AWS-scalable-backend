@@ -428,6 +428,61 @@ resource "aws_s3_bucket_policy" "assets" {
   })
 }
 
+# S3 Bucket for Terraform State
+resource "aws_s3_bucket" "terraform_state" {
+  bucket = "YOUR_S3_BUCKET_NAME_FOR_TERRAFORM_STATE" # MUST BE GLOBALLY UNIQUE -  consider using a project-specific prefix
+  # bucket = "${lower(var.project_name)}-terraform-state" # Example using project_name, but ensure uniqueness
+
+  versioning {
+    enabled = true
+  }
+
+  server_side_encryption_configuration {
+    rule {
+      apply_server_side_encryption_by_default {
+        sse_algorithm = "AES256"
+      }
+    }
+  }
+
+  # Optional: Enable bucket policy to restrict access if needed.
+  # For example, restrict access to specific IAM roles or accounts.
+  # For simplicity, this example omits a restrictive bucket policy.
+  # In a production scenario, consider implementing a more restrictive policy.
+
+  tags = merge(var.tags, {
+    Name        = "Terraform State Bucket"
+    Description = "Bucket to store Terraform state files"
+  })
+}
+
+resource "aws_s3_bucket_public_access_block" "terraform_state" {
+  bucket = aws_s3_bucket.terraform_state.id
+
+  block_public_acls       = true
+  block_public_policy     = true
+  ignore_public_acls      = true
+  restrict_public_buckets = true
+}
+
+
+# DynamoDB Table for Terraform State Locking
+resource "aws_dynamodb_table" "terraform_state_lock" {
+  name           = "terraform-state-locking" # You can customize the table name if needed
+  billing_mode   = "PAY_PER_REQUEST" # Or "PROVISIONED" if you prefer provisioned capacity
+  hash_key       = "LockID"
+
+  attribute {
+    name = "LockID"
+    type = "S" # String type
+  }
+
+  tags = merge(var.tags, {
+    Name        = "Terraform State Locking Table"
+    Description = "DynamoDB table for Terraform state locking"
+  })
+}
+
 # IAM Role for EC2 Instances
 resource "aws_iam_role" "instance_role" {
   name = "${var.project_name}-instance-role"
