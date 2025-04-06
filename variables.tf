@@ -104,8 +104,9 @@ variable "assets_bucket_name" {
 }
 
 variable "domain_name" {
-  description = "The domain name for the application"
+  description = "The domain name for the application (only used if enable_domain_features is true)"
   type        = string
+  default     = "example.local"
 }
 
 variable "alb_ssl_policy" {
@@ -124,12 +125,6 @@ variable "enable_domain_features" {
   description = "Set to true to enable Route 53, ACM certificate, and HTTPS listener creation. Requires a valid 'domain_name'."
   type        = bool
   default     = false
-}
-
-variable "domain_name" {
-  description = "The domain name for the application (only used if enable_domain_features is true)"
-  type        = string
-  default     = "example.local"
 }
 
 variable "create_route53_zone" {
