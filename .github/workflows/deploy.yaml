@@ -93,6 +93,7 @@ jobs:
         if: github.ref == 'refs/heads/main' && github.event_name == 'push'
         env:
           TF_VAR_db_password: ${{ secrets.DB_PASSWORD }}
+          TF_LOG: DEBUG
         run: terraform apply -var-file=terraform.tfvars -auto-approve
 
   deploy-app:
