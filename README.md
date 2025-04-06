@@ -34,6 +34,7 @@ This Terraform configuration creates the following core components:
     *   Route 53 DNS records for the domain and ACM validation (if `enable_domain_features` is true). Supports creating a new Route 53 zone or using an existing one.
 
 **(Optional but Recommended) Architecture Diagram:**
+```
                    +-----------------------+
                    |       Internet        |
                    +-----------+-----------+
@@ -71,7 +72,7 @@ This Terraform configuration creates the following core components:
 | (Edge Loc.)   |       |  (Private via    |
 +---------------+       | Origin Access ID)|
                         +------------------+
-
+```
 
 ## Features
 
