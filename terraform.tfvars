@@ -7,9 +7,6 @@ db_username        = "admin"
 # Database configuration
 db_name = "APP_DB_NAME"
 
-# db_username   = "APP_DB_USER"
-# db_password   = "PASSWORD"
-
 tags = {
   Environment = "ENV_PLACEHOLDER" # production, staging, development, etc.
   Project     = "PROJECT_NAME_PLACEHOLDER"
