@@ -103,6 +103,11 @@ variable "assets_bucket_name" {
   type        = string
 }
 
+variable "terraform_state_bucket_name" {
+  description = "Name of the S3 bucket to store Terraform state"
+  type        = string
+}
+
 variable "domain_name" {
   description = "The domain name for the application (only used if enable_domain_features is true)"
   type        = string
