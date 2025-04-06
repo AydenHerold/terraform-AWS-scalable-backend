@@ -430,8 +430,7 @@ resource "aws_s3_bucket_policy" "assets" {
 
 # S3 Bucket for Terraform State
 resource "aws_s3_bucket" "terraform_state" {
-  bucket = "YOUR_S3_BUCKET_NAME_FOR_TERRAFORM_STATE" # MUST BE GLOBALLY UNIQUE -  consider using a project-specific prefix
-  # bucket = "${lower(var.project_name)}-terraform-state" # Example using project_name, but ensure uniqueness
+  bucket = var.terraform_state_bucket_name
 
   versioning {
     enabled = true
