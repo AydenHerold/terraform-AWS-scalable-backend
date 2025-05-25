@@ -338,7 +338,8 @@ resource "aws_db_instance" "default" {
 
 # Assets S3 Bucket
 resource "aws_s3_bucket" "assets" {
-  bucket = var.assets_bucket_name
+  bucket = "YOUR_S3_BUCKET_NAME_FOR_TERRAFORM_STATE" # MUST BE GLOBALLY UNIQUE -  consider using a project-specific prefix
+  # bucket = "${lower(var.project_name)}-terraform-state" # Example using project_name, but ensure uniquenes
 
   tags = var.tags
 }
